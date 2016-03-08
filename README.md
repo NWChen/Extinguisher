@@ -3,8 +3,8 @@ Miniature firefighting robot for Columbia's introductory Art of Engineering cour
 
 To Do
 ---
-- [ ] Design smothering device
+- [x] Design smothering device
 - [ ] Revise smooth line following algorithm
 - [ ] Test sensor mast
 
-![](https://i.gyazo.com/9a0e4e1edc75004efff9ea1fb141b676.png)
+![](https://i.gyazo.com/4d95f63a62e76e7cad58bfa3bd6c3f48.png)
