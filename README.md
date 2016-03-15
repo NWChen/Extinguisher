@@ -7,4 +7,4 @@ To Do
 - [ ] Revise smooth line following algorithm
 - [ ] Test sensor mast
 
-![](https://i.gyazo.com/4d95f63a62e76e7cad58bfa3bd6c3f48.png)
+![](https://i.gyazo.com/1e3babfa02fb0273897a5d30515fbbce.png)
