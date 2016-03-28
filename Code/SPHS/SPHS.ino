@@ -6,14 +6,14 @@
 #define MOTORDATA 8
 
 #define LEFT_MOTOR 1
-#define RIGHT_MOTOR 2
+#define RIGHT_MOTOR 3
 
 #define MOTOR1_A 1
 #define MOTOR1_B 4
 #define MOTOR2_A 2
 #define MOTOR2_B 3
-#define MOTOR3_A 11 // 7
-#define MOTOR3_B 12 // 0
+#define MOTOR3_A 5 // 7
+#define MOTOR3_B 7 // 0
 #define MOTOR4_A 13 // 2
 #define MOTOR4_B 14 // 5
 
@@ -64,22 +64,32 @@ void loop() {
   //servo_2.write(SPONGE_DOWN);
   //delay(1000);
   
-  //turnRight(255);
-  //motor(LEFT_MOTOR, BACKWARD, 255);
-  //motor(RIGHT_MOTOR, BACKWARD, 255);
+  int speed = (int)Serial.read();
   
-  delay(500);
-  //motor(LEFT_MOTOR, FORWARD, 255);
-  motor(RIGHT_MOTOR, FORWARD, 255);
-  delay(500);
-  motor(RIGHT_MOTOR, BRAKE, 0);
-  delay(500);
-  motor(RIGHT_MOTOR, BACKWARD, 255);
+  Serial.println("FORWARD");
+  moveForward(speed);
+  
+  delay(1000);
+}
+
+void moveForward(int speed) {
+  motor(LEFT_MOTOR, BACKWARD, speed);
+  motor(RIGHT_MOTOR, FORWARD, speed);
+}
+
+void moveBackward(int speed) {
+  motor(LEFT_MOTOR, FORWARD, speed);
+  motor(RIGHT_MOTOR, BACKWARD, speed);
+}
+
+void turnLeft(int speed) {
+  motor(LEFT_MOTOR, BACKWARD, speed);
+  motor(RIGHT_MOTOR, BACKWARD, speed);
 }
 
 void turnRight(int speed) {
-  motor(1, FORWARD, speed);
-  motor(2, FORWARD, speed);
+  motor(LEFT_MOTOR, FORWARD, speed);
+  motor(RIGHT_MOTOR, FORWARD, speed);
 }
 
 boolean isLeftOn() {

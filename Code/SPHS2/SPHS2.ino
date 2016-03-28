@@ -5,10 +5,10 @@
 #define MOTORENABLE 7
 #define MOTORDATA 8
 
-#define MOTOR1_A 2
-#define MOTOR1_B 3
-#define MOTOR2_A 1
-#define MOTOR2_B 4
+#define MOTOR1_A 1
+#define MOTOR1_B 4
+#define MOTOR2_A 2
+#define MOTOR2_B 3
 #define MOTOR3_A 5
 #define MOTOR3_B 7
 #define MOTOR4_A 0
@@ -36,6 +36,7 @@ Servo servo_2;
 
 void setup()
 {
+  Serial.begin(9600);
   servo_1.attach(SERVO1_PWM);
   servo_2.attach(SERVO2_PWM);
 }
@@ -55,36 +56,43 @@ void loop() {
   servo_1.write(0);
   
 // ROBOT FORWARD FULLSPEED
+  Serial.println("FORWARD");
   motor(1, FORWARD, 255);
   motor(2, FORWARD, 255);
   delay(2000);
  
  // BRAKE Be friendly to the motor: stop it before reverse. 
+  Serial.println("RELEASE");
   motor(1, RELEASE, 0);
   motor(2, RELEASE, 0);
   delay(500);
 
 //ROBOT BACKWARD HALFSPEED
+  Serial.println("BACKWARD");
   motor(1, BACKWARD, 128);
   motor(2, BACKWARD, 128);
   delay(2000);
 
  // BRAKE Be friendly to the motor: stop it before reverse. 
+  Serial.println("BRAKE");
   motor(1, RELEASE, 0);
   motor(2, RELEASE, 0);
   delay(500);
 
 //SPIN IN PLACE
+  Serial.println("SPIN");
   motor(1, FORWARD, 255);
   motor(2, BACKWARD, 255);
   delay(2000);
 
  // BRAKE Be friendly to the motor: stop it before reverse. 
+  Serial.println("BRAKE");
   motor(1, RELEASE, 0);
   motor(2, RELEASE, 0);
   delay(500);
 
 //PIVOT TURN
+  Serial.println("PIVOT");
   motor(1, FORWARD, 255);
   motor(2, RELEASE, 0);
   delay(2000);
