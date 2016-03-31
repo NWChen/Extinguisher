@@ -4,7 +4,7 @@ Miniature firefighting robot for Columbia's introductory Art of Engineering cour
 To Do
 ---
 - [ ] Test NiMH fit in battery tray
-- [ ] Add standoff holes for Arduino support and baseplate
+- [x] Add standoff holes for Arduino support and baseplate
 - [ ] Revise smooth line following algorithm
 
-![](https://i.gyazo.com/1e3babfa02fb0273897a5d30515fbbce.png)
+![](https://i.gyazo.com/5e1a4e01aabe86251250a1ca99a9f712.png)
