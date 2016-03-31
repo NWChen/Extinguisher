@@ -7,4 +7,4 @@ To Do
 - [x] Add standoff holes for Arduino support and baseplate
 - [ ] Revise smooth line following algorithm
 
-![](https://i.gyazo.com/46bc9b986fc80926ed290dd11ab79415.png)
+![](https://i.gyazo.com/6ca9e9e6f85f7efbd7b934d8a1ebb0b6.png)
