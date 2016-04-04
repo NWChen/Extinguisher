@@ -5,7 +5,7 @@
 #define MOTORCLK 4
 #define MOTORENABLE 7
 #define MOTORDATA 8
-#define LEFT_MOTOR 1
+#define LEFT_MOTOR 2
 #define RIGHT_MOTOR 3
 #define MOTOR1_A 1
 #define MOTOR1_B 4
@@ -24,8 +24,8 @@
 #define BRAKE 3
 #define RELEASE 4
 #define SPEED 255
-#define SPEED_DIVIDER 2
-#define MOTION_DELAY 100
+#define SPEED_DIVIDER 3
+#define MOTION_DELAY 10
 
 // Servo control constants
 #define SPONGE_UP 70
@@ -36,10 +36,10 @@
 #define IR_LEFT 3
 #define IR_MIDDLE 4
 #define IR_RIGHT 5
-#define IR_FLAME 1
+#define IR_FLAME 2
 #define LIMIT_SWITCH 2
-#define THRESHOLD_BLACK 300
-#define THRESHOLD_FLAME 300
+#define THRESHOLD_BLACK 100
+#define THRESHOLD_FLAME 970
 #define THRESHOLD_SWITCH 600
 
 Servo servo;
@@ -54,7 +54,35 @@ void setup()
   Serial.begin(9600);
   servo.attach(SERVO_PWM);
 }
-
+/*
+void loop() {
+  Serial.print(analogRead(IR_LEFT));
+  Serial.print(", ");
+  Serial.print(isLeftOn());
+  Serial.println();
+  
+  Serial.print(analogRead(IR_MIDDLE));
+  Serial.print(", ");
+  Serial.print(isMiddleOn());
+  Serial.println();
+  
+  Serial.print(analogRead(IR_RIGHT));
+  Serial.print(", ");
+  Serial.print(isRightOn());
+  Serial.println();
+  
+  Serial.println("---");
+  delay(500);
+  
+  //halfTurnLeft(255);
+  delay(15);
+  releaseAllMotors();
+  
+  //halfTurnRight(255);
+  delay(15);
+  releaseAllMotors();
+}
+*/
 
 void loop() {
   
@@ -64,33 +92,77 @@ void loop() {
     Serial.println("|  x  |");
     moveForward(SPEED);
     delay(MOTION_DELAY);
+    releaseAllMotors();
   }
     
   // |x x  | or |x    |Robot to the right of the line
-  if((isLeftOn() || isMiddleOn()) && !isRightOn()) {
+  else if((isLeftOn() || isMiddleOn()) && !isRightOn()) {
     Serial.println("|x x  | or |x    |");
     halfTurnLeft(SPEED);
     delay(MOTION_DELAY);
+    releaseAllMotors();
   }
     
   // |  x x| or |    x| Robot to the left of the line
-  if((isRightOn() || isMiddleOn()) && !isLeftOn()) {
+  else if((isRightOn() || isMiddleOn()) && !isLeftOn()) {
     Serial.println("|  x x| or |    x|");
     halfTurnRight(SPEED);
     delay(MOTION_DELAY);
+    releaseAllMotors();
   }
-    
+  
   // |x x x| Robot at intersection
-  if(isLeftOn() && isMiddleOn() && isRightOn()) {
+  else if(isLeftOn() && isMiddleOn() && isRightOn()) {
+    int TURN_DELAY = 100*MOTION_DELAY;
+    
+    // Decide whether to turn left, turn right, or turn around.
+    while(isLeftOn() || isMiddleOn() || isRightOn()) {
+      Serial.println("INTERSECTION, KEEP MOVING FORWARD");
+      moveForward(255);
+      delay(MOTION_DELAY);
+    }
+    
+    // 0 = turn left; 1 = turn right; 2 = turn around
+    int decision = decideAtIntersection();
+    if(decision == 0) {
+      turnLeft(SPEED);
+      delay(TURN_DELAY);
+      moveForward(SPEED);
+      delay(TURN_DELAY);
+    }
+    else if(decision == 1) {
+      turnRight(SPEED);
+      delay(TURN_DELAY);
+      moveForward(SPEED);
+      delay(TURN_DELAY);
+    }
+    else if(decision == 2) {
+      Serial.println("wat");
+    }
+    
+    /*
     Serial.println("INTERSECTION");
+    turnLeft(SPEED);
+    delay(50*MOTION_DELAY);
+    releaseAllMotors();
+    */
   }
-  
+
   // |     | Robot has wandered off completely
-  if(!isLeftOn() && isMiddleOn() && isRightOn()) {
+  else {
     Serial.println("NO LINE");
+    moveForward(255);
+    delay(MOTION_DELAY);
+    releaseAllMotors();
   }
   
+  /*
   // IR sensor has detected a flame
+  if(isFlameDetected() || isSwitchHit()) {
+    Serial.println("FLAME DETECTED");
+    deploy();
+  }
+  */
   // Limit switch has been struck
 }
 
@@ -102,32 +174,69 @@ void loop() {
  
 void moveForward(int speed) {
   motor(LEFT_MOTOR, BACKWARD, speed);
-  motor(RIGHT_MOTOR, FORWARD, speed);
+  motor(RIGHT_MOTOR, BACKWARD, speed);
 }
 
 void moveBackward(int speed) {
   motor(LEFT_MOTOR, FORWARD, speed);
-  motor(RIGHT_MOTOR, BACKWARD, speed);
+  motor(RIGHT_MOTOR, FORWARD, speed);
 }
 
 void turnLeft(int speed) {
-  motor(LEFT_MOTOR, BACKWARD, speed);
+  motor(LEFT_MOTOR, FORWARD, speed);
   motor(RIGHT_MOTOR, BACKWARD, speed);
 }
 
 void turnRight(int speed) {
-  motor(LEFT_MOTOR, FORWARD, speed);
+  motor(LEFT_MOTOR, BACKWARD, speed);
   motor(RIGHT_MOTOR, FORWARD, speed);
 }
 
 void halfTurnLeft(int speed) {
-  motor(LEFT_MOTOR, BACKWARD, speed/SPEED_DIVIDER);
   motor(RIGHT_MOTOR, BACKWARD, speed);
 }
 
 void halfTurnRight(int speed) {
-  motor(LEFT_MOTOR, FORWARD, speed);
-  motor(RIGHT_MOTOR, FORWARD, speed/SPEED_DIVIDER);
+  motor(LEFT_MOTOR, BACKWARD, speed);
+}
+
+int decideAtIntersection() {
+  boolean isLeftOfInt = false;
+  boolean isRightOfInt = false;
+  Serial.println("DECIDE AT INTERSECTION");
+  
+  while(!isLeftOn()) {
+    turnLeft(SPEED);
+    delay(MOTION_DELAY);
+  }
+  if(isLeftOn())
+    isLeftOfInt = true;
+    
+  while(!isRightOn()) {
+    turnRight(SPEED);
+    delay(MOTION_DELAY);
+  }
+    
+  turnLeft(SPEED);
+  delay(50*MOTION_DELAY);
+    
+  if(!isLeftOn() && !isRightOn()) {
+    Serial.println("Turn around.");
+    return 2; // Turn around
+  }
+  if(isLeftOn() && !isRightOn()) {
+    Serial.println("Turn left.");
+    return 0; // Turn left
+  }
+  if(!isLeftOn() && isRightOn()) {
+    Serial.println("Turn right.");
+    return 1; // Turn right
+  }
+}
+
+void releaseAllMotors() {
+  motor(LEFT_MOTOR, RELEASE, 0);
+  motor(RIGHT_MOTOR, RELEASE, 0);
 }
 
 void deploy() {
@@ -135,7 +244,7 @@ void deploy() {
   delay(100);
   
   // Profile a motion to prevent stripping the servo from the momentum of the smothering linkage
-  for(int i=0; i<(SPONGE_DOWN - SPONGE_UP; i++) {
+  for(int i=0; i<(SPONGE_DOWN - SPONGE_UP); i++) {
     servo.write(i + SPONGE_UP);
     delay(i/2);
   }
@@ -158,7 +267,7 @@ boolean isRightOn() {
 }
 
 boolean isFlameDetected() {
-  return analogRead(IR_FLAME) > THRESHOLD_FLAME;
+  return analogRead(IR_FLAME) < THRESHOLD_FLAME;
 }
 
 boolean isSwitchHit() {
