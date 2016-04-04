@@ -28,7 +28,7 @@
 #define MOTION_DELAY 10
 
 // Servo control constants
-#define SPONGE_UP 70
+#define SPONGE_UP 90
 #define SPONGE_DOWN 160
 #define SERVO_PWM 9
 
@@ -37,12 +37,13 @@
 #define IR_MIDDLE 4
 #define IR_RIGHT 5
 #define IR_FLAME 2
-#define LIMIT_SWITCH 2
+#define LIMIT_SWITCH 1
 #define THRESHOLD_BLACK 100
 #define THRESHOLD_FLAME 970
 #define THRESHOLD_SWITCH 600
 
 Servo servo;
+float maxTurnTime = 0;
 
 /*
  * ****************************************************
@@ -53,98 +54,80 @@ void setup()
 {
   Serial.begin(9600);
   servo.attach(SERVO_PWM);
-}
-/*
-void loop() {
-  Serial.print(analogRead(IR_LEFT));
-  Serial.print(", ");
-  Serial.print(isLeftOn());
-  Serial.println();
-  
-  Serial.print(analogRead(IR_MIDDLE));
-  Serial.print(", ");
-  Serial.print(isMiddleOn());
-  Serial.println();
-  
-  Serial.print(analogRead(IR_RIGHT));
-  Serial.print(", ");
-  Serial.print(isRightOn());
-  Serial.println();
-  
-  Serial.println("---");
-  delay(500);
-  
-  //halfTurnLeft(255);
-  delay(15);
+  servo.write(SPONGE_UP);
+  float startTime = 0;
+  float endTime = 0;
+
+  // Calibration loop for turning measurements
+  startTime = millis();
+  while (!isLeftOn()) {
+    turnRight(SPEED);
+  }
   releaseAllMotors();
-  
-  //halfTurnRight(255);
-  delay(15);
-  releaseAllMotors();
+  endTime = 1.2 * millis();
+  maxTurnTime = endTime - startTime;
+  while (!isSwitchPressed()) {
+    Serial.println("READY TO GO.");
+  }
 }
-*/
 
 void loop() {
-  
+
   // Line following subroutine
   // |  x  | Robot in the center of the line
-  if(!isLeftOn() && isMiddleOn() && !isRightOn()) {
+  if (!isLeftOn() && isMiddleOn() && !isRightOn()) {
     Serial.println("|  x  |");
     moveForward(SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
   }
-    
+
   // |x x  | or |x    |Robot to the right of the line
-  else if((isLeftOn() || isMiddleOn()) && !isRightOn()) {
+  else if ((isLeftOn() || isMiddleOn()) && !isRightOn()) {
     Serial.println("|x x  | or |x    |");
     halfTurnLeft(SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
   }
-    
+
   // |  x x| or |    x| Robot to the left of the line
-  else if((isRightOn() || isMiddleOn()) && !isLeftOn()) {
+  else if ((isRightOn() || isMiddleOn()) && !isLeftOn()) {
     Serial.println("|  x x| or |    x|");
     halfTurnRight(SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
   }
-  
+
   // |x x x| Robot at intersection
-  else if(isLeftOn() && isMiddleOn() && isRightOn()) {
-    int TURN_DELAY = 100*MOTION_DELAY;
-    
+  else if (isLeftOn() && isMiddleOn() && isRightOn()) {
+    int TURN_DELAY = 100 * MOTION_DELAY;
+
+    // Turn right 
+
+    /*
     // Decide whether to turn left, turn right, or turn around.
-    while(isLeftOn() || isMiddleOn() || isRightOn()) {
+    while (isLeftOn() || isMiddleOn() || isRightOn()) {
       Serial.println("INTERSECTION, KEEP MOVING FORWARD");
       moveForward(255);
       delay(MOTION_DELAY);
     }
-    
     // 0 = turn left; 1 = turn right; 2 = turn around
     int decision = decideAtIntersection();
-    if(decision == 0) {
+    if (decision == 0) {
       turnLeft(SPEED);
       delay(TURN_DELAY);
       moveForward(SPEED);
       delay(TURN_DELAY);
     }
-    else if(decision == 1) {
+    else if (decision == 1) {
       turnRight(SPEED);
       delay(TURN_DELAY);
       moveForward(SPEED);
       delay(TURN_DELAY);
     }
-    else if(decision == 2) {
-      Serial.println("wat");
+    else if (decision == 2) {
+      moveForward(SPEED);
     }
-    
-    /*
-    Serial.println("INTERSECTION");
-    turnLeft(SPEED);
-    delay(50*MOTION_DELAY);
-    releaseAllMotors();
     */
   }
 
@@ -155,7 +138,7 @@ void loop() {
     delay(MOTION_DELAY);
     releaseAllMotors();
   }
-  
+
   /*
   // IR sensor has detected a flame
   if(isFlameDetected() || isSwitchHit()) {
@@ -170,8 +153,8 @@ void loop() {
  * ****************************************************
  * Functional abstractions for robot motion and sensing
  * ****************************************************
- */ 
- 
+ */
+
 void moveForward(int speed) {
   motor(LEFT_MOTOR, BACKWARD, speed);
   motor(RIGHT_MOTOR, BACKWARD, speed);
@@ -200,40 +183,69 @@ void halfTurnRight(int speed) {
   motor(LEFT_MOTOR, BACKWARD, speed);
 }
 
+boolean isSwitchPressed() {
+  if (analogRead(LIMIT_SWITCH) > 1000)
+    return true;
+  return false;
+}
+
+/*
 int decideAtIntersection() {
   boolean isLeftOfInt = false;
   boolean isRightOfInt = false;
+  float startTime = 0;
+  float endTime = 0;
+  float elapsedTime = 0;
   Serial.println("DECIDE AT INTERSECTION");
-  
-  while(!isLeftOn()) {
-    turnLeft(SPEED);
-    delay(MOTION_DELAY);
-  }
-  if(isLeftOn())
-    isLeftOfInt = true;
-    
-  while(!isRightOn()) {
+
+  // While we don't encounter another (possibly right) line,
+  // or we haven't exceeded our estimated 90 degree turn, keep turning right.
+  startTime = millis();
+  while (!isRightOn() && elapsedTime < maxTurnTime) {
+    Serial.println("SEEKING RIGHT LINE.");
     turnRight(SPEED);
     delay(MOTION_DELAY);
+    elapsedTime = millis() - startTime;
   }
-    
+  if (isRightOn())
+    isRightOfInt = true;
+
+  // While we don't encounter another (possibly left) line,
+  // or we haven't exceeded our estimated 180 degree turn (hence 2*maxTurnTime),
+  // keep turning left.
+  startTime = millis();
+  boolean hasDetectedOneLine = false;
+  while ((hasDetectedOneLine == false && !isLeftOn()) || elapsedTime < 2 * maxTurnTime) {
+    Serial.println("SEEKING LEFT LINE.");
+
+    // If we've passed over a line, it could be the top line at a four-way intersection, so keep going.
+    if (isLeftOn()) {
+      hasDetectedOneLine = true;
+    }
+    turnLeft(SPEED);
+    delay(MOTION_DELAY);
+    elapsedTime = millis() - startTime;
+  }
+  if (isLeftOn())
+    isLeftOfInt = true;
+
   turnLeft(SPEED);
-  delay(50*MOTION_DELAY);
-    
-  if(!isLeftOn() && !isRightOn()) {
+  delay(50 * MOTION_DELAY);
+
+  if (!isLeftOn() && !isRightOn()) {
     Serial.println("Turn around.");
     return 2; // Turn around
   }
-  if(isLeftOn() && !isRightOn()) {
+  if (isLeftOn() && !isRightOn()) {
     Serial.println("Turn left.");
     return 0; // Turn left
   }
-  if(!isLeftOn() && isRightOn()) {
+  if (!isLeftOn() && isRightOn()) {
     Serial.println("Turn right.");
     return 1; // Turn right
   }
 }
-
+*/
 void releaseAllMotors() {
   motor(LEFT_MOTOR, RELEASE, 0);
   motor(RIGHT_MOTOR, RELEASE, 0);
@@ -242,11 +254,11 @@ void releaseAllMotors() {
 void deploy() {
   servo.write(SPONGE_UP);
   delay(100);
-  
+
   // Profile a motion to prevent stripping the servo from the momentum of the smothering linkage
-  for(int i=0; i<(SPONGE_DOWN - SPONGE_UP); i++) {
+  for (int i = 0; i < (SPONGE_DOWN - SPONGE_UP); i++) {
     servo.write(i + SPONGE_UP);
-    delay(i/2);
+    delay(i / 2);
   }
 
   delay(100);
@@ -270,10 +282,6 @@ boolean isFlameDetected() {
   return analogRead(IR_FLAME) < THRESHOLD_FLAME;
 }
 
-boolean isSwitchHit() {
-  return analogRead(LIMIT_SWITCH) > THRESHOLD_SWITCH;
-}
-
 /*
  * ****************************************************
  * Predefined low-level control code
@@ -284,58 +292,58 @@ void motor(int nMotor, int command, int speed)
   int motorA, motorB;
 
   if (nMotor >= 1 && nMotor <= 4)
-  {  
+  {
     switch (nMotor)
     {
-    case 1:
-      motorA   = MOTOR1_A;
-      motorB   = MOTOR1_B;
-      break;
-    case 2:
-      motorA   = MOTOR2_A;
-      motorB   = MOTOR2_B;
-      break;
-    case 3:
-      motorA   = MOTOR3_A;
-      motorB   = MOTOR3_B;
-      break;
-    case 4:
-      motorA   = MOTOR4_A;
-      motorB   = MOTOR4_B;
-      break;
-    default:
-      break;
+      case 1:
+        motorA   = MOTOR1_A;
+        motorB   = MOTOR1_B;
+        break;
+      case 2:
+        motorA   = MOTOR2_A;
+        motorB   = MOTOR2_B;
+        break;
+      case 3:
+        motorA   = MOTOR3_A;
+        motorB   = MOTOR3_B;
+        break;
+      case 4:
+        motorA   = MOTOR4_A;
+        motorB   = MOTOR4_B;
+        break;
+      default:
+        break;
     }
 
     switch (command)
     {
-    case FORWARD:
-      motor_output (motorA, HIGH, speed);
-      motor_output (motorB, LOW, -1);     // -1: no PWM set
-      break;
-    case BACKWARD:
-      motor_output (motorA, LOW, speed);
-      motor_output (motorB, HIGH, -1);    // -1: no PWM set
-      break;
-    case BRAKE:
-      // The AdaFruit library didn't implement a brake.
-      // The L293D motor driver ic doesn't have a good
-      // brake anyway.
-      // It uses transistors inside, and not mosfets.
-      // Some use a software break, by using a short
-      // reverse voltage.
-      // This brake will try to brake, by enabling 
-      // the output and by pulling both outputs to ground.
-      // But it isn't a good break.
-      motor_output (motorA, LOW, 255); // 255: fully on.
-      motor_output (motorB, LOW, -1);  // -1: no PWM set
-      break;
-    case RELEASE:
-      motor_output (motorA, LOW, 0);  // 0: output floating.
-      motor_output (motorB, LOW, -1); // -1: no PWM set
-      break;
-    default:
-      break;
+      case FORWARD:
+        motor_output (motorA, HIGH, speed);
+        motor_output (motorB, LOW, -1);     // -1: no PWM set
+        break;
+      case BACKWARD:
+        motor_output (motorA, LOW, speed);
+        motor_output (motorB, HIGH, -1);    // -1: no PWM set
+        break;
+      case BRAKE:
+        // The AdaFruit library didn't implement a brake.
+        // The L293D motor driver ic doesn't have a good
+        // brake anyway.
+        // It uses transistors inside, and not mosfets.
+        // Some use a software break, by using a short
+        // reverse voltage.
+        // This brake will try to brake, by enabling
+        // the output and by pulling both outputs to ground.
+        // But it isn't a good break.
+        motor_output (motorA, LOW, 255); // 255: fully on.
+        motor_output (motorB, LOW, -1);  // -1: no PWM set
+        break;
+      case RELEASE:
+        motor_output (motorA, LOW, 0);  // 0: output floating.
+        motor_output (motorB, LOW, -1); // -1: no PWM set
+        break;
+      default:
+        break;
     }
   }
 }
@@ -345,21 +353,21 @@ void motor(int nMotor, int command, int speed)
 // motor_output
 //
 // The function motor_ouput uses the motor driver to
-// drive normal outputs like lights, relays, solenoids, 
+// drive normal outputs like lights, relays, solenoids,
 // DC motors (but not in reverse).
 //
-// It is also used as an internal helper function 
+// It is also used as an internal helper function
 // for the motor() function.
 //
-// The high_low variable should be set 'HIGH' 
+// The high_low variable should be set 'HIGH'
 // to drive lights, etc.
-// It can be set 'LOW', to switch it off, 
+// It can be set 'LOW', to switch it off,
 // but also a 'speed' of 0 will switch it off.
 //
-// The 'speed' sets the PWM for 0...255, and is for 
+// The 'speed' sets the PWM for 0...255, and is for
 // both pins of the motor output.
 //   For example, if motor 3 side 'A' is used to for a
-//   dimmed light at 50% (speed is 128), also the 
+//   dimmed light at 50% (speed is 128), also the
 //   motor 3 side 'B' output will be dimmed for 50%.
 // Set to 0 for completelty off (high impedance).
 // Set to 255 for fully on.
@@ -372,38 +380,38 @@ void motor_output (int output, int high_low, int speed)
 
   switch (output)
   {
-  case MOTOR1_A:
-  case MOTOR1_B:
-    motorPWM = MOTOR1_PWM;
-    break;
-  case MOTOR2_A:
-  case MOTOR2_B:
-    motorPWM = MOTOR2_PWM;
-    break;
-  case MOTOR3_A:
-  case MOTOR3_B:
-    motorPWM = MOTOR3_PWM;
-    break;
-  case MOTOR4_A:
-  case MOTOR4_B:
-    motorPWM = MOTOR4_PWM;
-    break;
-  default:
-    // Use speed as error flag, -3333 = invalid output.
-    speed = -3333;
-    break;
+    case MOTOR1_A:
+    case MOTOR1_B:
+      motorPWM = MOTOR1_PWM;
+      break;
+    case MOTOR2_A:
+    case MOTOR2_B:
+      motorPWM = MOTOR2_PWM;
+      break;
+    case MOTOR3_A:
+    case MOTOR3_B:
+      motorPWM = MOTOR3_PWM;
+      break;
+    case MOTOR4_A:
+    case MOTOR4_B:
+      motorPWM = MOTOR4_PWM;
+      break;
+    default:
+      // Use speed as error flag, -3333 = invalid output.
+      speed = -3333;
+      break;
   }
 
   if (speed != -3333)
   {
-    // Set the direction with the shift register 
+    // Set the direction with the shift register
     // on the MotorShield, even if the speed = -1.
     // In that case the direction will be set, but
     // not the PWM.
     shiftWrite(output, high_low);
 
     // set PWM only if it is valid
-    if (speed >= 0 && speed <= 255)    
+    if (speed >= 0 && speed <= 255)
     {
       analogWrite(motorPWM, speed);
     }
@@ -416,7 +424,7 @@ void motor_output (int output, int high_low, int speed)
 //
 // The parameters are just like digitalWrite().
 //
-// The output is the pin 0...7 (the pin behind 
+// The output is the pin 0...7 (the pin behind
 // the shift register).
 // The second parameter is HIGH or LOW.
 //
@@ -429,7 +437,7 @@ void shiftWrite(int output, int high_low)
   static int latch_copy;
   static int shift_register_initialized = false;
 
-  // Do the initialization on the fly, 
+  // Do the initialization on the fly,
   // at the first time it is used.
   if (!shift_register_initialized)
   {
