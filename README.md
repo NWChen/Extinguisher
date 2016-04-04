@@ -3,8 +3,9 @@ Miniature firefighting robot for Columbia's introductory Art of Engineering cour
 
 To Do
 ---
-- [ ] Test NiMH fit in battery tray
-- [x] Add standoff holes for Arduino support and baseplate
-- [ ] Revise smooth line following algorithm
+- [ ] Develop heat-seeking algorithm
+- [ ] Revise turning calibration in setup function
+- [ ] Work on smothering linkage deployment and counterbalancing
 
 ![](https://i.gyazo.com/6ca9e9e6f85f7efbd7b934d8a1ebb0b6.png)
+![](https://lh3.googleusercontent.com/zfvzIkc0Vz9N2RxQkCQ3tgkUBnCD0gegXmjXatVsJrWqck-BqTkUOlxZvUgnIupDX8oKpkH_Yhs0BtLXASl34_hTKo_PQU_Z1RmhZLK7eedCDUAJVvd2wpGiHFFpyX_XnSRr0GtQEUkQ1vAasOjXyus9Q4RVcoQ_04kYILvT_P5FutyjjjCr8OoMRXv9kSBUOSf34x5_wktakwzkl_XYHabp2wfQshgPbCXfdn6E2BG7Nv3PH5rhM1L_QbK4gs9iAhxKulHYgkqq0wyb9BQWzW73dP2Naa9I0jIk8qpM5-rGSCZfsXJW0y_I2l7Js9itLH4ZT73xRRfiiJmN9Vx60vJ_KZagOw1qBrcL_Fq_eWkB3voKv8Ooh-CDFKsusdF2QwsCP0OVL55_WvnXdO6h_lp-9mEanXTL961Ndcp4pbekwNyLpJFt8IYZoevSk3-_dy7SK6rf1NbjgfL6GFuwEyWAFLWnQv2NnU2d6mPToiXKSIAy5erHZnFMJ_7tJ8VRGUiF3NnbCYskQLxUJwpNr-T8ROBHpAhJ2DZNVoY0gQsX4aEPi-t2c7Fkt9BNMlFup2XSvg=w1912-h1075-no)
