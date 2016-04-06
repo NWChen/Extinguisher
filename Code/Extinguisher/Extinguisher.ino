@@ -60,88 +60,30 @@ void setup()
 void loop() {
 
   // Line following subroutine
-  // |  x  | Robot in the center of the line
-  if (!isLeftOn() && isMiddleOn() && !isRightOn()) {
-    Serial.println("|  x  |");
+  // We follow the right edge of the line, which is assumed to have thickness wider
+  // than the range of the IR transmitter-receiver pair,
+  // so as to implicitly handle intersections of varying degree.
+  
+  // |x x  | Robot in the center of the right line edge
+  if(isLeftOn() && isMiddleOn() && !isRightOn()) {
     moveForward(SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
   }
 
-  // |x x  | or |x    |Robot to the right of the line
-  else if ((isLeftOn() || isMiddleOn()) && !isRightOn()) {
-    Serial.println("|x x  | or |x    |");
+  // |x    | or |     | Robot to the right of the right line edge
+  if(!isMiddleOn() && !isRightOn()) {
     halfTurnLeft(SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
   }
-
-  // |  x x| or |    x| Robot to the left of the line
-  else if ((isRightOn() || isMiddleOn()) && !isLeftOn()) {
-    Serial.println("|  x x| or |    x|");
+  
+  // |  x x| or |    x| Robot to the left of the right line edge
+  if(!isLeftOn() && isRightOn()) {
     halfTurnRight(SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
   }
-
-  // |x x x| Robot at intersection
-  else if (isLeftOn() && isMiddleOn() && isRightOn()) {
-    Serial.println("|x x x|");
-    
-    // Variables to determine the state of the intersection.
-    boolean forwardLineExists = false;
-    boolean rightLineExists = false;
-    boolean leftLineExists = false;
-    
-    // Move forward until the line sensor clears the forward edge of the intersection.
-    // This ensures the line sensor never mistakes the intersection for another line.
-    while(isLeftOn() && isMiddleOn() && isRightOn()) {
-      Serial.println("CLEARING INTERSECTION...");
-      moveForward(SPEED);
-      delay(MOTION_DELAY);
-    }
-    
-    // Proceed forward slightly, just to give us extra clearance from the forward edge of the intersection.
-    // Then determine whether a forward line exists.
-    moveForward(SPEED);
-    delay(250); // Change this to a value dependent on maxTurnTime
-    if(isLeftOn() || isMiddleOn() || isRightOn())
-      forwardLineExists = true;
-    
-    // Determine whether a right line exists.
-    // Turn as close to a right angle as we can, making measurements along the way.
-    float startTime = millis();
-    while(!hasExceededRightAngle(millis() - startTime)) {
-      Serial.println("SEEKING RIGHT LINE...");
-      turnRight(SPEED);
-      delay(MOTION_DELAY);
-      
-      // Check if we've detected a line.
-      // Ensure we're not just detecting the line that we started on.
-      if(isMiddleOn() && (millis()-startTime > maxTurnTime/5.0))
-        rightLineExists = true;
-    }
-      
-    // If a right line exists, we should take it,
-    // so check whether we found a right line or not.
-  }
-
-  // |     | Robot has wandered off completely
-  else {
-    Serial.println("NO LINE");
-    moveForward(SPEED);
-    delay(MOTION_DELAY);
-    releaseAllMotors();
-  }
-
-  /*
-  // IR sensor has detected a flame
-  if(isFlameDetected() || isSwitchHit()) {
-    Serial.println("FLAME DETECTED");
-    deploy();
-  }
-  */
-  // Limit switch has been struck
 }
 
 /*
@@ -184,12 +126,6 @@ boolean isSwitchPressed() {
   return false;
 }
 
-boolean hasExceededRightAngle(float time) {
-  if(time > maxTurnTime)
-    return true;
-  return false;
-}
-
 void releaseAllMotors() {
   motor(LEFT_MOTOR, RELEASE, 0);
   motor(RIGHT_MOTOR, RELEASE, 0);
@@ -222,8 +158,8 @@ boolean isRightOn() {
   return analogRead(IR_RIGHT) > THRESHOLD_BLACK;
 }
 
-boolean isFlameDetected() {
-  return analogRead(IR_FLAME) < THRESHOLD_FLAME;
+int getFlame() {
+  analogRead(IR_FLAME);
 }
 
 /*
