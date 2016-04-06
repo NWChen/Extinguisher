@@ -24,7 +24,7 @@
 #define BRAKE 3
 #define RELEASE 4
 #define SPEED 255
-#define SPEED_DIVIDER 3
+#define HALF_SPEED 150
 #define MOTION_DELAY 10
 
 // Servo control constants
@@ -55,20 +55,6 @@ void setup()
   Serial.begin(9600);
   servo.attach(SERVO_PWM);
   servo.write(SPONGE_UP);
-  float startTime = 0;
-  float endTime = 0;
-
-  // Calibration loop for turning measurements
-  startTime = millis();
-  while (!isLeftOn()) {
-    turnRight(SPEED);
-  }
-  releaseAllMotors();
-  endTime = 1.2 * millis();
-  maxTurnTime = endTime - startTime;
-  while (!isSwitchPressed()) {
-    Serial.println("READY TO GO.");
-  }
 }
 
 void loop() {
@@ -100,41 +86,50 @@ void loop() {
 
   // |x x x| Robot at intersection
   else if (isLeftOn() && isMiddleOn() && isRightOn()) {
-    int TURN_DELAY = 100 * MOTION_DELAY;
-
-    // Turn right 
-
-    /*
-    // Decide whether to turn left, turn right, or turn around.
-    while (isLeftOn() || isMiddleOn() || isRightOn()) {
-      Serial.println("INTERSECTION, KEEP MOVING FORWARD");
-      moveForward(255);
+    Serial.println("|x x x|");
+    
+    // Variables to determine the state of the intersection.
+    boolean forwardLineExists = false;
+    boolean rightLineExists = false;
+    boolean leftLineExists = false;
+    
+    // Move forward until the line sensor clears the forward edge of the intersection.
+    // This ensures the line sensor never mistakes the intersection for another line.
+    while(isLeftOn() && isMiddleOn() && isRightOn()) {
+      Serial.println("CLEARING INTERSECTION...");
+      moveForward(SPEED);
       delay(MOTION_DELAY);
     }
-    // 0 = turn left; 1 = turn right; 2 = turn around
-    int decision = decideAtIntersection();
-    if (decision == 0) {
-      turnLeft(SPEED);
-      delay(TURN_DELAY);
-      moveForward(SPEED);
-      delay(TURN_DELAY);
-    }
-    else if (decision == 1) {
+    
+    // Proceed forward slightly, just to give us extra clearance from the forward edge of the intersection.
+    // Then determine whether a forward line exists.
+    moveForward(SPEED);
+    delay(250); // Change this to a value dependent on maxTurnTime
+    if(isLeftOn() || isMiddleOn() || isRightOn())
+      forwardLineExists = true;
+    
+    // Determine whether a right line exists.
+    // Turn as close to a right angle as we can, making measurements along the way.
+    float startTime = millis();
+    while(!hasExceededRightAngle(millis() - startTime)) {
+      Serial.println("SEEKING RIGHT LINE...");
       turnRight(SPEED);
-      delay(TURN_DELAY);
-      moveForward(SPEED);
-      delay(TURN_DELAY);
+      delay(MOTION_DELAY);
+      
+      // Check if we've detected a line.
+      // Ensure we're not just detecting the line that we started on.
+      if(isMiddleOn() && (millis()-startTime > maxTurnTime/5.0))
+        rightLineExists = true;
     }
-    else if (decision == 2) {
-      moveForward(SPEED);
-    }
-    */
+      
+    // If a right line exists, we should take it,
+    // so check whether we found a right line or not.
   }
 
   // |     | Robot has wandered off completely
   else {
     Serial.println("NO LINE");
-    moveForward(255);
+    moveForward(SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
   }
@@ -189,63 +184,12 @@ boolean isSwitchPressed() {
   return false;
 }
 
-/*
-int decideAtIntersection() {
-  boolean isLeftOfInt = false;
-  boolean isRightOfInt = false;
-  float startTime = 0;
-  float endTime = 0;
-  float elapsedTime = 0;
-  Serial.println("DECIDE AT INTERSECTION");
-
-  // While we don't encounter another (possibly right) line,
-  // or we haven't exceeded our estimated 90 degree turn, keep turning right.
-  startTime = millis();
-  while (!isRightOn() && elapsedTime < maxTurnTime) {
-    Serial.println("SEEKING RIGHT LINE.");
-    turnRight(SPEED);
-    delay(MOTION_DELAY);
-    elapsedTime = millis() - startTime;
-  }
-  if (isRightOn())
-    isRightOfInt = true;
-
-  // While we don't encounter another (possibly left) line,
-  // or we haven't exceeded our estimated 180 degree turn (hence 2*maxTurnTime),
-  // keep turning left.
-  startTime = millis();
-  boolean hasDetectedOneLine = false;
-  while ((hasDetectedOneLine == false && !isLeftOn()) || elapsedTime < 2 * maxTurnTime) {
-    Serial.println("SEEKING LEFT LINE.");
-
-    // If we've passed over a line, it could be the top line at a four-way intersection, so keep going.
-    if (isLeftOn()) {
-      hasDetectedOneLine = true;
-    }
-    turnLeft(SPEED);
-    delay(MOTION_DELAY);
-    elapsedTime = millis() - startTime;
-  }
-  if (isLeftOn())
-    isLeftOfInt = true;
-
-  turnLeft(SPEED);
-  delay(50 * MOTION_DELAY);
-
-  if (!isLeftOn() && !isRightOn()) {
-    Serial.println("Turn around.");
-    return 2; // Turn around
-  }
-  if (isLeftOn() && !isRightOn()) {
-    Serial.println("Turn left.");
-    return 0; // Turn left
-  }
-  if (!isLeftOn() && isRightOn()) {
-    Serial.println("Turn right.");
-    return 1; // Turn right
-  }
+boolean hasExceededRightAngle(float time) {
+  if(time > maxTurnTime)
+    return true;
+  return false;
 }
-*/
+
 void releaseAllMotors() {
   motor(LEFT_MOTOR, RELEASE, 0);
   motor(RIGHT_MOTOR, RELEASE, 0);
