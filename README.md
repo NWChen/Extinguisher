@@ -4,7 +4,7 @@ Miniature firefighting robot for Columbia's introductory Art of Engineering cour
 To Do
 ---
 - [ ] Develop heat-seeking algorithm
-- [ ] Revise intersection handling algorithm
+- [ ] Right-edge following
 - [ ] Work on balloon smotherer
 
 ![](https://i.gyazo.com/6ca9e9e6f85f7efbd7b934d8a1ebb0b6.png)
