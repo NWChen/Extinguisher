@@ -5,6 +5,6 @@ To Do
 ---
 - [ ] Develop heat-seeking algorithm
 - [ ] Right-edge following
-- [ ] Work on balloon smotherer
+- [ ] Grind down edges of casters
 
 ![](https://i.gyazo.com/6ca9e9e6f85f7efbd7b934d8a1ebb0b6.png)
