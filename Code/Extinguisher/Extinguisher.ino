@@ -25,7 +25,7 @@
 #define RELEASE 4
 #define SPEED 255
 #define HALF_SPEED 150
-#define MOTION_DELAY 10
+#define MOTION_DELAY 50
 
 // Servo control constants
 #define SPONGE_UP 90
@@ -43,7 +43,7 @@
 #define THRESHOLD_SWITCH 600
 
 Servo servo;
-float maxTurnTime = 0;
+String lastPrintedString = "";
 
 /*
  * ****************************************************
@@ -55,32 +55,54 @@ void setup()
   Serial.begin(9600);
   servo.attach(SERVO_PWM);
   servo.write(SPONGE_UP);
+  
+  // Wait for user input to begin moving.
+  while(!isSwitchPressed()) {
+    print("PRESS SWITCH TO START.");
+  }
 }
 
 void loop() {
-
+  Serial.print(isLeftOn());
+  Serial.print(" ");
+  Serial.print(isMiddleOn());
+  Serial.print(" ");
+  Serial.print(isRightOn());
+  Serial.print(" ");  
+  Serial.println();
   // Line following subroutine
   // We follow the right edge of the line, which is assumed to have thickness wider
   // than the range of the IR transmitter-receiver pair,
   // so as to implicitly handle intersections of varying degree.
   
-  // |x x  | Robot in the center of the right line edge
-  if(isLeftOn() && isMiddleOn() && !isRightOn()) {
+  // |x    | or |x x  | Robot in the center of the right line edge
+  if((isLeftOn() || isMiddleOn()) && !isRightOn()) {
+    print("|x    |");
     moveForward(SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
   }
 
-  // |x    | or |     | Robot to the right of the right line edge
-  if(!isMiddleOn() && !isRightOn()) {
+  // |     | Robot to the right of the right line edge
+  else if(!isMiddleOn() && !isRightOn()) {
+    print("|     |");
     halfTurnLeft(SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
   }
   
-  // |  x x| or |    x| Robot to the left of the right line edge
-  if(!isLeftOn() && isRightOn()) {
+  // |x x x| or |  x x| or |    x| or |  x  | Robot to the left of the right line edge
+  else if(isRightOn() || isMiddleOn()) {
+    print("|x x x| or |  x x| or |    x| or |  x  |");
     halfTurnRight(SPEED);
+    delay(MOTION_DELAY);
+    releaseAllMotors();
+  }
+  
+  // |     | No line found
+  if(!isLeftOn() && !isMiddleOn() && !isRightOn()) {
+    print("|     |");
+    turnLeft(SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
   }
@@ -88,7 +110,7 @@ void loop() {
 
 /*
  * ****************************************************
- * Functional abstractions for robot motion and sensing
+ * Functional abstractions for robot motion
  * ****************************************************
  */
 
@@ -120,12 +142,6 @@ void halfTurnRight(int speed) {
   motor(LEFT_MOTOR, BACKWARD, speed);
 }
 
-boolean isSwitchPressed() {
-  if (analogRead(LIMIT_SWITCH) > 1000)
-    return true;
-  return false;
-}
-
 void releaseAllMotors() {
   motor(LEFT_MOTOR, RELEASE, 0);
   motor(RIGHT_MOTOR, RELEASE, 0);
@@ -146,6 +162,17 @@ void deploy() {
   delay(500);
 }
 
+/*
+ * *******************************************************
+ * Functional abstractions for robot sensing and debugging
+ * *******************************************************
+ */
+boolean isSwitchPressed() {
+  if (analogRead(LIMIT_SWITCH) > 1000)
+    return true;
+  return false;
+}
+
 boolean isLeftOn() {
   return analogRead(IR_LEFT) > THRESHOLD_BLACK;
 }
@@ -160,6 +187,13 @@ boolean isRightOn() {
 
 int getFlame() {
   analogRead(IR_FLAME);
+}
+
+void print(String s) {
+  if(s!=lastPrintedString) {
+    Serial.println(s);
+    s = lastPrintedString;
+  }
 }
 
 /*
