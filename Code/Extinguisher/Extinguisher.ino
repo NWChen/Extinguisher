@@ -63,27 +63,28 @@ void setup()
 }
 
 void loop() {
-  Serial.print(isLeftOn());
-  Serial.print(" ");
-  Serial.print(isMiddleOn());
-  Serial.print(" ");
-  Serial.print(isRightOn());
-  Serial.print(" ");  
-  Serial.println();
   // Line following subroutine
   // We follow the right edge of the line, which is assumed to have thickness wider
   // than the range of the IR transmitter-receiver pair,
   // so as to implicitly handle intersections of varying degree.
   
   // |x    | or |x x  | Robot in the center of the right line edge
-  if((isLeftOn() || isMiddleOn()) && !isRightOn()) {
+  if(isLeftOn()) {
     print("|x    |");
     moveForward(SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
   }
 
-  // |     | Robot to the right of the right line edge
+  // |x x x| or |  x x| or |    x| or |  x  | Robot to the left of the right line edge
+  else if(isRightOn() || (!isLeftOn() && isMiddleOn() && !isRightOn())) {
+    print("|  x x| or |    x| or |  x  |");
+    halfTurnRight(SPEED);
+    delay(MOTION_DELAY);
+    releaseAllMotors();
+  }
+
+  // |x    | Robot to the right of the right line edge, or no line found
   else if(!isMiddleOn() && !isRightOn()) {
     print("|     |");
     halfTurnLeft(SPEED);
@@ -91,16 +92,8 @@ void loop() {
     releaseAllMotors();
   }
   
-  // |x x x| or |  x x| or |    x| or |  x  | Robot to the left of the right line edge
-  else if(isRightOn() || isMiddleOn()) {
-    print("|x x x| or |  x x| or |    x| or |  x  |");
-    halfTurnRight(SPEED);
-    delay(MOTION_DELAY);
-    releaseAllMotors();
-  }
-  
   // |     | No line found
-  if(!isLeftOn() && !isMiddleOn() && !isRightOn()) {
+  else if(!isLeftOn() && !isMiddleOn() && !isRightOn()) {
     print("|     |");
     turnLeft(SPEED);
     delay(MOTION_DELAY);
