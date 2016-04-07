@@ -25,7 +25,7 @@
 #define RELEASE 4
 #define SPEED 255
 #define HALF_SPEED 150
-#define MOTION_DELAY 50
+#define MOTION_DELAY 25
 
 // Servo control constants
 #define SPONGE_UP 90
@@ -68,34 +68,26 @@ void loop() {
   // than the range of the IR transmitter-receiver pair,
   // so as to implicitly handle intersections of varying degree.
   
-  // |x    | or |x x  | Robot in the center of the right line edge
-  if(isLeftOn()) {
-    print("|x    |");
+  // |? x  | Robot to the right of the right line edge
+  if(isMiddleOn() && !isRightOn()) {
+    print("|? x  |");
     moveForward(SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
   }
 
-  // |x x x| or |  x x| or |    x| or |  x  | Robot to the left of the right line edge
-  else if(isRightOn() || (!isLeftOn() && isMiddleOn() && !isRightOn())) {
-    print("|  x x| or |    x| or |  x  |");
+  // |? ? x| Robot to the left of the right line edge
+  else if(isRightOn()) {
+    print("|? ? x|");
     halfTurnRight(SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
   }
 
-  // |x    | Robot to the right of the right line edge, or no line found
+  // |? ? ?| Robot to the right of the right line edge, or no line found
   else if(!isMiddleOn() && !isRightOn()) {
-    print("|     |");
+    print("|? ? ?|");
     halfTurnLeft(SPEED);
-    delay(MOTION_DELAY);
-    releaseAllMotors();
-  }
-  
-  // |     | No line found
-  else if(!isLeftOn() && !isMiddleOn() && !isRightOn()) {
-    print("|     |");
-    turnLeft(SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
   }
