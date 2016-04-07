@@ -41,7 +41,10 @@
 #define THRESHOLD_BLACK 100
 #define THRESHOLD_FLAME 970
 #define THRESHOLD_SWITCH 600
+#define MAX_READINGS 100
 
+int flameReadings[MAX_READINGS];
+int currentReading = 0;
 Servo servo;
 String lastPrintedString = "";
 
@@ -68,6 +71,15 @@ void loop() {
   // than the range of the IR transmitter-receiver pair,
   // so as to implicitly handle intersections of varying degree.
   
+  // Update flame readings once every loop
+  flameReadings[currentReading] = getFlame();
+  currentReading++;
+  if(currentReading >= 100)
+    currentReading = 0;
+  
+  // Seek a flame. Sure.
+  // seekFlame();
+  
   // |? x  | Robot to the right of the right line edge
   if(isMiddleOn() && !isRightOn()) {
     print("|? x  |");
@@ -84,10 +96,18 @@ void loop() {
     releaseAllMotors();
   }
 
-  // |? ? ?| Robot to the right of the right line edge, or no line found
-  else if(!isMiddleOn() && !isRightOn()) {
-    print("|? ? ?|");
+  // |x    | Robot far to the right of the right line edge
+  else if(isLeftOn() && !isMiddleOn() && !isRightOn()) {
+    print("|x    |");
     halfTurnLeft(SPEED);
+    delay(MOTION_DELAY);
+    releaseAllMotors();
+  }
+  
+  // |     | Robot has completely wandered off the line
+  else if(!isLeftOn() && !isMiddleOn() && !isRightOn()) {
+    print("|     |");
+    turnLeft(SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
   }
@@ -170,8 +190,46 @@ boolean isRightOn() {
   return analogRead(IR_RIGHT) > THRESHOLD_BLACK;
 }
 
+// Get the value of the IR flame sensor.
+// Map this value to a smaller range to prevent integer overflow when computing a moving average.
 int getFlame() {
-  analogRead(IR_FLAME);
+  return map(analogRead(IR_FLAME), 0, 1023, 0, 100);
+}
+
+// Get the average of the last 100 samples.
+int getAverageFlame() {
+  int sum = 0;
+  for(int i=0; i<MAX_READINGS; i++)
+    sum += flameReadings[i];
+  return sum/MAX_READINGS;
+}
+
+// Turn towards maximum flame readings.
+// Returns true if the algorithm can converge on a flame; false otherwise.
+boolean seekFlame() {
+  int lastReading = 0;
+  int leftMax = 0;
+  int rightMax = 0;
+  
+  while(getFlame() > lastReading) {
+    Serial.println("L: " + String(getFlame()) + ", " + String(lastReading));
+    lastReading = getFlame();
+    if(lastReading > leftMax)
+      leftMax = lastReading;
+    turnLeft(10*MOTION_DELAY);
+    releaseAllMotors();
+  }
+  
+  lastReading = 0;
+  while(getFlame() > lastReading) {
+    Serial.println("R:  " + String(getFlame()) + ", " + String(lastReading));
+    lastReading = getFlame();
+    if(lastReading > rightMax)
+      rightMax = lastReading;
+    turnRight(10*MOTION_DELAY);
+    releaseAllMotors();
+  }
+  
 }
 
 void print(String s) {
