@@ -25,7 +25,7 @@
 #define RELEASE 4
 #define SPEED 255
 #define HALF_SPEED 150
-#define MOTION_DELAY 25
+#define MOTION_DELAY 10
 
 // Servo control constants
 #define SPONGE_UP 90
@@ -76,14 +76,14 @@ void loop() {
   currentReading++;
   if(currentReading >= 100)
     currentReading = 0;
-  
+  /*
   // Seek a flame. Sure.
   if(getFlame() > getAverageFlame()) {
     print("POTENTIAL FLAME DETECTED.");
     if(seekFlame())
       deploy();
   }
-  
+  */
   // |? x  | Robot to the right of the right line edge
   if(isMiddleOn() && !isRightOn()) {
     print("|? x  |");
