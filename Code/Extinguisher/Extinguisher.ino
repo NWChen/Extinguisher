@@ -78,7 +78,11 @@ void loop() {
     currentReading = 0;
   
   // Seek a flame. Sure.
-  // seekFlame();
+  if(getFlame() > getAverageFlame()) {
+    print("POTENTIAL FLAME DETECTED.");
+    if(seekFlame())
+      deploy();
+  }
   
   // |? x  | Robot to the right of the right line edge
   if(isMiddleOn() && !isRightOn()) {
@@ -207,29 +211,58 @@ int getAverageFlame() {
 // Turn towards maximum flame readings.
 // Returns true if the algorithm can converge on a flame; false otherwise.
 boolean seekFlame() {
-  int lastReading = 0;
-  int leftMax = 0;
-  int rightMax = 0;
+  int TURN_DELAY = 1000;
+  int TURN_SPEED = 150;
   
-  while(getFlame() > lastReading) {
-    Serial.println("L: " + String(getFlame()) + ", " + String(lastReading));
-    lastReading = getFlame();
-    if(lastReading > leftMax)
-      leftMax = lastReading;
-    turnLeft(10*MOTION_DELAY);
-    releaseAllMotors();
+  // Scan right
+  int maxFlameRight = 0;
+  int startTime = millis();
+  while((millis()-startTime) > TURN_DELAY) {
+    print("SCANNING RIGHT FOR FLAME.");
+    turnRight(TURN_SPEED);
+    delay(MOTION_DELAY);
+    if(getFlame() > maxFlameRight)
+      maxFlameRight = getFlame();
   }
   
-  lastReading = 0;
-  while(getFlame() > lastReading) {
-    Serial.println("R:  " + String(getFlame()) + ", " + String(lastReading));
-    lastReading = getFlame();
-    if(lastReading > rightMax)
-      rightMax = lastReading;
-    turnRight(10*MOTION_DELAY);
-    releaseAllMotors();
+  // Return to center position
+  startTime = millis();
+  while((millis()-startTime) > TURN_DELAY) {
+    print("RETURNING TO CENTER.");
+    turnLeft(TURN_SPEED);
+    delay(MOTION_DELAY);
   }
   
+  // Scan left
+  int maxFlameLeft = 0;
+  startTime = millis();
+  while((millis()-startTime) > TURN_DELAY) {
+    print("SCANNING LEFT FOR FLAME.");
+    turnLeft(TURN_SPEED);
+    delay(MOTION_DELAY);
+    if(getFlame() > maxFlameLeft)
+      maxFlameLeft = getFlame();
+  }
+  
+  if((maxFlameLeft < 20) && (maxFlameRight < 20)) {
+    print("DID NOT CONVERGE ON A FLAME.");
+    return false;
+  }
+  
+  // Evaluate scan results
+  if(maxFlameRight > maxFlameLeft) 
+    while(getFlame() < (maxFlameRight-5)) {
+      print("PURSUING RIGHT FLAME.");
+      turnRight(TURN_SPEED);
+      delay(MOTION_DELAY);
+    }
+  else 
+    while(getFlame() < (maxFlameLeft-5)) {
+      print("PURSUING LEFT FLAME.");
+      turnLeft(TURN_SPEED);
+      delay(MOTION_DELAY);
+    }
+  return true;
 }
 
 void print(String s) {
