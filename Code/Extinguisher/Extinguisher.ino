@@ -29,7 +29,7 @@
 
 // Servo control constants
 #define SPONGE_UP 90
-#define SPONGE_DOWN 160
+#define SPONGE_DOWN 20
 #define SERVO_PWM 9
 
 // Sensor constants
@@ -39,7 +39,7 @@
 #define IR_FLAME 2
 #define LIMIT_SWITCH 1
 #define THRESHOLD_BLACK 100
-#define THRESHOLD_FLAME 970
+#define THRESHOLD_FLAME 50
 #define THRESHOLD_SWITCH 600
 #define MAX_READINGS 100
 
@@ -76,14 +76,14 @@ void loop() {
   currentReading++;
   if(currentReading >= 100)
     currentReading = 0;
-  /*
-  // Seek a flame. Sure.
-  if(getFlame() > getAverageFlame()) {
+  
+  // Seek a flame.
+  if(getFlame() > THRESHOLD_FLAME) {
     print("POTENTIAL FLAME DETECTED.");
     if(seekFlame())
       deploy();
   }
-  */
+  
   // |? x  | Robot to the right of the right line edge
   if(isMiddleOn() && !isRightOn()) {
     print("|? x  |");
@@ -157,18 +157,30 @@ void releaseAllMotors() {
 }
 
 void deploy() {
+  /*
+  int SPONGE_DEPLOY;
   servo.write(SPONGE_UP);
   delay(100);
 
   // Profile a motion to prevent stripping the servo from the momentum of the smothering linkage
-  for (int i = 0; i < (SPONGE_DOWN - SPONGE_UP); i++) {
-    servo.write(i + SPONGE_UP);
-    delay(i / 2);
+  for (int i = 0; i < (SPONGE_DEPLOY < SPONGE_DOWN); i++) {
+    SPONGE_DEPLOY = i^2 + SPONGE_UP;
+    servo.write(SPONGE_DEPLOY);
+    delay(50);
   }
 
   delay(100);
   servo.write(SPONGE_UP);
   delay(500);
+  */
+  servo.write(SPONGE_UP);
+  delay(100);
+  for(int i=SPONGE_UP; i>SPONGE_DOWN; i--) {
+    servo.write(i);
+    delay(SPONGE_UP-i);
+  }
+  delay(200);
+  servo.write(SPONGE_UP);
 }
 
 /*
@@ -196,8 +208,9 @@ boolean isRightOn() {
 
 // Get the value of the IR flame sensor.
 // Map this value to a smaller range to prevent integer overflow when computing a moving average.
+// Higher value corresponds to a higher flame intensity.
 int getFlame() {
-  return map(analogRead(IR_FLAME), 0, 1023, 0, 100);
+  return map(analogRead(IR_FLAME), 0, 1023, 100, 0);
 }
 
 // Get the average of the last 100 samples.
@@ -217,7 +230,7 @@ boolean seekFlame() {
   // Scan right
   int maxFlameRight = 0;
   int startTime = millis();
-  while((millis()-startTime) > TURN_DELAY) {
+  while((millis()-startTime) < TURN_DELAY) {
     print("SCANNING RIGHT FOR FLAME.");
     turnRight(TURN_SPEED);
     delay(MOTION_DELAY);
@@ -227,7 +240,7 @@ boolean seekFlame() {
   
   // Return to center position
   startTime = millis();
-  while((millis()-startTime) > TURN_DELAY) {
+  while((millis()-startTime) < TURN_DELAY) {
     print("RETURNING TO CENTER.");
     turnLeft(TURN_SPEED);
     delay(MOTION_DELAY);
@@ -236,10 +249,11 @@ boolean seekFlame() {
   // Scan left
   int maxFlameLeft = 0;
   startTime = millis();
-  while((millis()-startTime) > TURN_DELAY) {
+  while((millis()-startTime) < TURN_DELAY) {
     print("SCANNING LEFT FOR FLAME.");
     turnLeft(TURN_SPEED);
     delay(MOTION_DELAY);
+    releaseAllMotors();
     if(getFlame() > maxFlameLeft)
       maxFlameLeft = getFlame();
   }
@@ -255,12 +269,14 @@ boolean seekFlame() {
       print("PURSUING RIGHT FLAME.");
       turnRight(TURN_SPEED);
       delay(MOTION_DELAY);
+      releaseAllMotors();
     }
   else 
     while(getFlame() < (maxFlameLeft-5)) {
       print("PURSUING LEFT FLAME.");
       turnLeft(TURN_SPEED);
       delay(MOTION_DELAY);
+      releaseAllMotors();
     }
   return true;
 }
