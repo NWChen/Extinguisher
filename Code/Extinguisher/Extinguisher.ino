@@ -28,7 +28,7 @@
 #define MOTION_DELAY 10
 
 // Servo control constants
-#define SPONGE_UP 90
+#define SPONGE_UP 80
 #define SPONGE_DOWN 20
 #define SERVO_PWM 9
 
@@ -43,8 +43,10 @@
 #define THRESHOLD_SWITCH 600
 #define MAX_READINGS 100
 
+// Other state variables and objects
 int flameReadings[MAX_READINGS];
 int currentReading = 0;
+int lastReading = 0;
 Servo servo;
 String lastPrintedString = "";
 
@@ -55,6 +57,8 @@ String lastPrintedString = "";
  */
 void setup()
 {
+  
+  // Set up serial communication and the servo
   Serial.begin(9600);
   servo.attach(SERVO_PWM);
   servo.write(SPONGE_UP);
@@ -125,41 +129,49 @@ void loop() {
  * ****************************************************
  */
 
+// Move forwards.
 void moveForward(int speed) {
   motor(LEFT_MOTOR, BACKWARD, speed);
   motor(RIGHT_MOTOR, BACKWARD, speed);
 }
 
+// Move backwards.
 void moveBackward(int speed) {
   motor(LEFT_MOTOR, FORWARD, speed);
   motor(RIGHT_MOTOR, FORWARD, speed);
 }
 
+// Turn left in place.
 void turnLeft(int speed) {
   motor(LEFT_MOTOR, FORWARD, speed);
   motor(RIGHT_MOTOR, BACKWARD, speed);
 }
 
+// Turn right in place.
 void turnRight(int speed) {
   motor(LEFT_MOTOR, BACKWARD, speed);
   motor(RIGHT_MOTOR, FORWARD, speed);
 }
 
+// Gradually turn left.
 void halfTurnLeft(int speed) {
   motor(LEFT_MOTOR, FORWARD, 50);
   motor(RIGHT_MOTOR, BACKWARD, speed);
 }
 
+// Gradually turn right.
 void halfTurnRight(int speed) {
   motor(LEFT_MOTOR, BACKWARD, speed);
   motor(RIGHT_MOTOR, FORWARD, 50);
 }
 
+// Release control of all motors to prevent commands from continuing.
 void releaseAllMotors() {
   motor(LEFT_MOTOR, RELEASE, 0);
   motor(RIGHT_MOTOR, RELEASE, 0);
 }
 
+// Lower and raise the smothering mechanism to put out the flame.
 void deploy() {
   // Reset the smothering mechanism to its upright position
   const int TIMEOUT = 5;
@@ -198,20 +210,29 @@ void deploy() {
  * Functional abstractions for robot sensing and debugging
  * *******************************************************
  */
+ 
+// Determines if the limit switch is pressed.
+// Returns true if the switch is depressed; false otherwise.
 boolean isSwitchPressed() {
   if (analogRead(LIMIT_SWITCH) > 1000)
     return true;
   return false;
 }
 
+// Determines the state of the left line sensor.
+// Returns true if black; false if white.
 boolean isLeftOn() {
   return analogRead(IR_LEFT) > THRESHOLD_BLACK;
 }
 
+// Determines the state of the middle line sensor.
+// Returns true if black; false if white.
 boolean isMiddleOn() {
   return analogRead(IR_MIDDLE) > THRESHOLD_BLACK;
 }
 
+// Determines the state of the right line sensor.
+// Returns true if black; false if white.
 boolean isRightOn() {
   return analogRead(IR_RIGHT) > THRESHOLD_BLACK;
 }
@@ -297,15 +318,26 @@ boolean seekFlame() {
 }
 
 // Approach a flame by getting as close as possible to it.
+// We are close to the flame once the limit switch is depressed,
+// or once flame readings from the IR sensor begin to level off.
 void approachFlame() {
-  while(!isSwitchPressed()) {
+  int startTime = 0;
+  while(!isSwitchPressed() || getFlame() < lastReading) {
     print("APPROACHING FLAME.");
+    lastReading = getFlame() - 2; // Subtract 2 to account for flame variation
     moveForward(150);
     delay(MOTION_DELAY);
     releaseAllMotors();
+    
+    // Every 1 second, seek the flame again to ensure proper orientation
+    if(millis() - startTime > 1000) {
+      startTime = 0;
+      seekFlame();
+    }
   }
 }
 
+// Print messages to the serial monitor without repetition.
 void print(String s) {
   if(s!=lastPrintedString) {
     Serial.println(s);
