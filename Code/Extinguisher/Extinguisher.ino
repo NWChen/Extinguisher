@@ -80,8 +80,10 @@ void loop() {
   // Seek a flame.
   if(getFlame() > THRESHOLD_FLAME) {
     print("POTENTIAL FLAME DETECTED.");
-    if(seekFlame())
+    if(seekFlame()) {
+      approachFlame();
       deploy();
+    }
   }
   
   // |? x  | Robot to the right of the right line edge
@@ -157,30 +159,36 @@ void releaseAllMotors() {
 }
 
 void deploy() {
-  /*
-  int SPONGE_DEPLOY;
-  servo.write(SPONGE_UP);
-  delay(100);
-
-  // Profile a motion to prevent stripping the servo from the momentum of the smothering linkage
-  for (int i = 0; i < (SPONGE_DEPLOY < SPONGE_DOWN); i++) {
-    SPONGE_DEPLOY = i^2 + SPONGE_UP;
-    servo.write(SPONGE_DEPLOY);
-    delay(50);
+  // Reset the smothering mechanism to its upright position
+  const int TIMEOUT = 5;
+  if(servo.read() < SPONGE_UP)
+    for(int i=servo.read(); i<SPONGE_UP; i++) {
+      servo.write(i);
+      delay(TIMEOUT);
+    }
+  else
+    for(int i=servo.read(); i>SPONGE_UP; i++) {
+      servo.write(i);
+      delay(TIMEOUT);
+    } 
+  
+  // Smoothly deploy the smothering mechanism
+  // Accelerate as we approach the midpoint of the range of motion
+  for(int i=servo.read(); i>SPONGE_DOWN+((SPONGE_UP-SPONGE_DOWN)/2); i--) {
+    servo.write(pow(i,1.5));
+    delay(TIMEOUT);
   }
-
-  delay(100);
-  servo.write(SPONGE_UP);
-  delay(500);
-  */
-  servo.write(SPONGE_UP);
-  delay(100);
-  for(int i=SPONGE_UP; i>SPONGE_DOWN; i--) {
+  // Decelerate as we approach the end of the range of motion
+  for(int i=servo.read(); i>SPONGE_DOWN; i--) {
+    servo.write(pow(i,1.5));
+    delay(TIMEOUT);
+  }
+  
+  // Reset the smothering mechanism to its upright position
+  for(int i=servo.read(); i<SPONGE_UP; i++) {
     servo.write(i);
-    delay(SPONGE_UP-i);
+    delay(TIMEOUT);
   }
-  delay(200);
-  servo.write(SPONGE_UP);
 }
 
 /*
@@ -224,16 +232,17 @@ int getAverageFlame() {
 // Turn towards maximum flame readings.
 // Returns true if the algorithm can converge on a flame; false otherwise.
 boolean seekFlame() {
-  int TURN_DELAY = 1000;
-  int TURN_SPEED = 150;
+  const int TURN_DELAY = 1000;
+  const int TURN_SPEED = 150;
   
-  // Scan right
+  // Scan right for a flame
   int maxFlameRight = 0;
   int startTime = millis();
   while((millis()-startTime) < TURN_DELAY) {
     print("SCANNING RIGHT FOR FLAME.");
     turnRight(TURN_SPEED);
     delay(MOTION_DELAY);
+    releaseAllMotors();
     if(getFlame() > maxFlameRight)
       maxFlameRight = getFlame();
   }
@@ -244,9 +253,10 @@ boolean seekFlame() {
     print("RETURNING TO CENTER.");
     turnLeft(TURN_SPEED);
     delay(MOTION_DELAY);
+    releaseAllMotors();
   }
   
-  // Scan left
+  // Scan left for a flame
   int maxFlameLeft = 0;
   startTime = millis();
   while((millis()-startTime) < TURN_DELAY) {
@@ -258,13 +268,15 @@ boolean seekFlame() {
       maxFlameLeft = getFlame();
   }
   
-  if((maxFlameLeft < 20) && (maxFlameRight < 20)) {
+  // Determine whether a flame actually exists
+  if((maxFlameLeft < 30) && (maxFlameRight < 30)) {
     print("DID NOT CONVERGE ON A FLAME.");
     return false;
   }
   
   // Evaluate scan results
   if(maxFlameRight > maxFlameLeft) 
+    // Turn towards the flame if it is towards the right.
     while(getFlame() < (maxFlameRight-5)) {
       print("PURSUING RIGHT FLAME.");
       turnRight(TURN_SPEED);
@@ -272,6 +284,7 @@ boolean seekFlame() {
       releaseAllMotors();
     }
   else 
+    // Turn towards the flame if it is towards the left.
     while(getFlame() < (maxFlameLeft-5)) {
       print("PURSUING LEFT FLAME.");
       turnLeft(TURN_SPEED);
@@ -279,6 +292,16 @@ boolean seekFlame() {
       releaseAllMotors();
     }
   return true;
+}
+
+// Approach a flame by getting as close as possible to it.
+void approachFlame() {
+  while(!isSwitchPressed()) {
+    print("APPROACHING FLAME.");
+    moveForward(150);
+    delay(MOTION_DELAY);
+    releaseAllMotors();
+  }
 }
 
 void print(String s) {
