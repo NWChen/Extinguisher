@@ -7,4 +7,4 @@ To Do
 - [ ] Right-edge following
 - [ ] Grind down edges of casters
 
-![](https://i.gyazo.com/6ca9e9e6f85f7efbd7b934d8a1ebb0b6.png)
+![](https://i.gyazo.com/bdb1da59b6e32926141c7d8d3f6b500c.gif)
