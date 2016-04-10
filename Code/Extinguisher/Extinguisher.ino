@@ -146,13 +146,13 @@ void turnRight(int speed) {
 }
 
 void halfTurnLeft(int speed) {
-  motor(LEFT_MOTOR, FORWARD, 150);
+  motor(LEFT_MOTOR, FORWARD, 50);
   motor(RIGHT_MOTOR, BACKWARD, speed);
 }
 
 void halfTurnRight(int speed) {
   motor(LEFT_MOTOR, BACKWARD, speed);
-  motor(RIGHT_MOTOR, FORWARD, 150);
+  motor(RIGHT_MOTOR, FORWARD, 50);
 }
 
 void releaseAllMotors() {
