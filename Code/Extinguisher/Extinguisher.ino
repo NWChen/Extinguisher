@@ -39,7 +39,8 @@
 #define IR_FLAME 2
 #define LIMIT_SWITCH 1
 #define THRESHOLD_BLACK 100
-#define THRESHOLD_FLAME 50
+#define THRESHOLD_FLAME 70
+#define THRESHOLD_EDGE 500
 #define THRESHOLD_SWITCH 600
 #define MAX_READINGS 100
 
@@ -70,16 +71,29 @@ void setup()
 }
 
 void loop() {
+  
   // Line following subroutine
   // We follow the right edge of the line, which is assumed to have thickness wider
   // than the range of the IR transmitter-receiver pair,
   // so as to implicitly handle intersections of varying degree.
-  
+ 
   // Update flame readings once every loop
   flameReadings[currentReading] = getFlame();
   currentReading++;
   if(currentReading >= 100)
     currentReading = 0;
+  
+  // Make sure we don't fall off the maze.
+  if(isOverEdge()) {
+    moveBackward(SPEED);
+    delay(1000);
+    releaseAllMotors();
+    while(!isRightOn()) {
+      turnLeft(SPEED);
+      delay(MOTION_DELAY);
+      releaseAllMotors();
+    }
+  }
   
   // Seek a flame.
   if(getFlame() > THRESHOLD_FLAME) {
@@ -155,14 +169,12 @@ void turnRight(int speed) {
 
 // Gradually turn left.
 void halfTurnLeft(int speed) {
-  motor(LEFT_MOTOR, FORWARD, 50);
   motor(RIGHT_MOTOR, BACKWARD, speed);
 }
 
 // Gradually turn right.
 void halfTurnRight(int speed) {
   motor(LEFT_MOTOR, BACKWARD, speed);
-  motor(RIGHT_MOTOR, FORWARD, 50);
 }
 
 // Release control of all motors to prevent commands from continuing.
@@ -173,8 +185,10 @@ void releaseAllMotors() {
 
 // Lower and raise the smothering mechanism to put out the flame.
 void deploy() {
+  
   // Reset the smothering mechanism to its upright position
-  const int TIMEOUT = 5;
+  const int TIMEOUT = 10;
+  /*
   if(servo.read() < SPONGE_UP)
     for(int i=servo.read(); i<SPONGE_UP; i++) {
       servo.write(i);
@@ -203,6 +217,16 @@ void deploy() {
     servo.write(i);
     delay(TIMEOUT);
   }
+  */
+  servo.write(SPONGE_UP);
+  delay(300);
+  for(int i=SPONGE_UP; i>SPONGE_DOWN; i--) {
+    servo.write(i);
+    delay(TIMEOUT);
+  }
+  delay(1000);
+  servo.write(SPONGE_UP);
+  delay(300);
 }
 
 /*
@@ -217,6 +241,13 @@ boolean isSwitchPressed() {
   if (analogRead(LIMIT_SWITCH) > 1000)
     return true;
   return false;
+}
+
+// Determines whether the robot has reached an edge with no wall,
+// in which case it could fall off the maze.
+// Returns true if in danger of falling; false otherwise.
+boolean isOverEdge() {
+  return (analogRead(IR_LEFT) > THRESHOLD_EDGE) && (analogRead(IR_MIDDLE) > THRESHOLD_EDGE) && (analogRead(IR_RIGHT) > THRESHOLD_EDGE);
 }
 
 // Determines the state of the left line sensor.
@@ -255,13 +286,13 @@ int getAverageFlame() {
 // Turn towards maximum flame readings.
 // Returns true if the algorithm can converge on a flame; false otherwise.
 boolean seekFlame() {
-  const int TURN_DELAY = 1000;
+  const unsigned long TURN_DELAY = 1000;
   const int TURN_SPEED = 150;
   
   // Scan right for a flame
   int maxFlameRight = 0;
-  int startTime = millis();
-  while((millis()-startTime) < TURN_DELAY) {
+  long startTime = millis();
+  while((millis()-startTime) < TURN_DELAY && !isSwitchPressed()) {
     print("SCANNING RIGHT FOR FLAME.");
     turnRight(TURN_SPEED);
     delay(MOTION_DELAY);
@@ -272,7 +303,7 @@ boolean seekFlame() {
   
   // Return to center position
   startTime = millis();
-  while((millis()-startTime) < TURN_DELAY) {
+  while((millis()-startTime) < TURN_DELAY && !isSwitchPressed()) {
     print("RETURNING TO CENTER.");
     turnLeft(TURN_SPEED);
     delay(MOTION_DELAY);
@@ -282,13 +313,22 @@ boolean seekFlame() {
   // Scan left for a flame
   int maxFlameLeft = 0;
   startTime = millis();
-  while((millis()-startTime) < TURN_DELAY) {
+  while((millis()-startTime) < TURN_DELAY && !isSwitchPressed()) {
     print("SCANNING LEFT FOR FLAME.");
     turnLeft(TURN_SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
     if(getFlame() > maxFlameLeft)
       maxFlameLeft = getFlame();
+  }
+  
+  // Return to center position
+  startTime = millis();
+  while((millis()-startTime) < TURN_DELAY && !isSwitchPressed()) {
+    print("RETURNING TO CENTER.");
+    turnRight(TURN_SPEED);
+    delay(MOTION_DELAY);
+    releaseAllMotors();
   }
   
   // Determine whether a flame actually exists
@@ -298,22 +338,26 @@ boolean seekFlame() {
   }
   
   // Evaluate scan results
-  if(maxFlameRight > maxFlameLeft) 
+  if(maxFlameRight > maxFlameLeft) {
     // Turn towards the flame if it is towards the right.
-    while(getFlame() < (maxFlameRight-5)) {
+    startTime = millis();
+    while(((getFlame() < (maxFlameRight-5)) || (millis()-startTime < 3000)) && !isSwitchPressed()) {
       print("PURSUING RIGHT FLAME.");
       turnRight(TURN_SPEED);
       delay(MOTION_DELAY);
       releaseAllMotors();
     }
-  else 
+  }
+  else {
     // Turn towards the flame if it is towards the left.
-    while(getFlame() < (maxFlameLeft-5)) {
+    startTime = millis();
+    while(getFlame() < (maxFlameLeft-5) || (millis()-startTime < 3000)) {
       print("PURSUING LEFT FLAME.");
       turnLeft(TURN_SPEED);
       delay(MOTION_DELAY);
       releaseAllMotors();
     }
+  }
   return true;
 }
 
@@ -321,18 +365,18 @@ boolean seekFlame() {
 // We are close to the flame once the limit switch is depressed,
 // or once flame readings from the IR sensor begin to level off.
 void approachFlame() {
-  int startTime = 0;
-  while(!isSwitchPressed() || getFlame() < lastReading) {
+  long startTime = millis();
+  while(!isSwitchPressed()) {
     print("APPROACHING FLAME.");
-    lastReading = getFlame() - 2; // Subtract 2 to account for flame variation
-    moveForward(150);
+    moveForward(SPEED);
     delay(MOTION_DELAY);
     releaseAllMotors();
     
     // Every 1 second, seek the flame again to ensure proper orientation
-    if(millis() - startTime > 1000) {
-      startTime = 0;
+    if((millis() - startTime) > 1000ul) {
+      print("REORIENTING TOWARDS FLAME.");
       seekFlame();
+      startTime = millis();
     }
   }
 }
