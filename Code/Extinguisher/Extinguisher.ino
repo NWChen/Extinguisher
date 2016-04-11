@@ -39,15 +39,12 @@
 #define IR_FLAME 2
 #define LIMIT_SWITCH 1
 #define THRESHOLD_BLACK 100
-#define THRESHOLD_FLAME 70
+#define THRESHOLD_FLAME 90
 #define THRESHOLD_EDGE 500
 #define THRESHOLD_SWITCH 600
 #define MAX_READINGS 100
 
 // Other state variables and objects
-int flameReadings[MAX_READINGS];
-int currentReading = 0;
-int lastReading = 0;
 Servo servo;
 String lastPrintedString = "";
 
@@ -76,30 +73,22 @@ void loop() {
   // We follow the right edge of the line, which is assumed to have thickness wider
   // than the range of the IR transmitter-receiver pair,
   // so as to implicitly handle intersections of varying degree.
- 
-  // Update flame readings once every loop
-  flameReadings[currentReading] = getFlame();
-  currentReading++;
-  if(currentReading >= 100)
-    currentReading = 0;
+  Serial.println(getFlame());
   
   // Make sure we don't fall off the maze.
   if(isOverEdge()) {
     moveBackward(SPEED);
     delay(1000);
     releaseAllMotors();
-    while(!isRightOn()) {
-      turnLeft(SPEED);
-      delay(MOTION_DELAY);
-      releaseAllMotors();
-    }
+    turnLeft(SPEED);
+    delay(250);
+    releaseAllMotors();
   }
   
   // Seek a flame.
   if(getFlame() > THRESHOLD_FLAME) {
     print("POTENTIAL FLAME DETECTED.");
     if(seekFlame()) {
-      approachFlame();
       deploy();
     }
   }
@@ -188,43 +177,17 @@ void deploy() {
   
   // Reset the smothering mechanism to its upright position
   const int TIMEOUT = 10;
-  /*
-  if(servo.read() < SPONGE_UP)
-    for(int i=servo.read(); i<SPONGE_UP; i++) {
-      servo.write(i);
-      delay(TIMEOUT);
-    }
-  else
-    for(int i=servo.read(); i>SPONGE_UP; i++) {
-      servo.write(i);
-      delay(TIMEOUT);
-    } 
-  
-  // Smoothly deploy the smothering mechanism
-  // Accelerate as we approach the midpoint of the range of motion
-  for(int i=servo.read(); i>SPONGE_DOWN+((SPONGE_UP-SPONGE_DOWN)/2); i--) {
-    servo.write(pow(i,1.5));
-    delay(TIMEOUT);
-  }
-  // Decelerate as we approach the end of the range of motion
-  for(int i=servo.read(); i>SPONGE_DOWN; i--) {
-    servo.write(pow(i,1.5));
-    delay(TIMEOUT);
-  }
-  
-  // Reset the smothering mechanism to its upright position
-  for(int i=servo.read(); i<SPONGE_UP; i++) {
-    servo.write(i);
-    delay(TIMEOUT);
-  }
-  */
   servo.write(SPONGE_UP);
   delay(300);
+  
+  // Lower the smothering mechanism
   for(int i=SPONGE_UP; i>SPONGE_DOWN; i--) {
     servo.write(i);
     delay(TIMEOUT);
   }
-  delay(1000);
+  delay(15000);
+  
+  // Reset the smothering mechanism
   servo.write(SPONGE_UP);
   delay(300);
 }
@@ -275,108 +238,33 @@ int getFlame() {
   return map(analogRead(IR_FLAME), 0, 1023, 100, 0);
 }
 
-// Get the average of the last 100 samples.
-int getAverageFlame() {
-  int sum = 0;
-  for(int i=0; i<MAX_READINGS; i++)
-    sum += flameReadings[i];
-  return sum/MAX_READINGS;
-}
-
 // Turn towards maximum flame readings.
 // Returns true if the algorithm can converge on a flame; false otherwise.
 boolean seekFlame() {
-  const unsigned long TURN_DELAY = 1000;
-  const int TURN_SPEED = 150;
+  int lastReading = 0;
+  const int FLAME_TOLERANCE = 0;
+  const int FORWARD_DELAY = 50;
   
-  // Scan right for a flame
-  int maxFlameRight = 0;
-  long startTime = millis();
-  while((millis()-startTime) < TURN_DELAY && !isSwitchPressed()) {
-    print("SCANNING RIGHT FOR FLAME.");
-    turnRight(TURN_SPEED);
-    delay(MOTION_DELAY);
-    releaseAllMotors();
-    if(getFlame() > maxFlameRight)
-      maxFlameRight = getFlame();
-  }
+  // Turn right for intentional offset here?
   
-  // Return to center position
-  startTime = millis();
-  while((millis()-startTime) < TURN_DELAY && !isSwitchPressed()) {
-    print("RETURNING TO CENTER.");
-    turnLeft(TURN_SPEED);
-    delay(MOTION_DELAY);
-    releaseAllMotors();
-  }
-  
-  // Scan left for a flame
-  int maxFlameLeft = 0;
-  startTime = millis();
-  while((millis()-startTime) < TURN_DELAY && !isSwitchPressed()) {
-    print("SCANNING LEFT FOR FLAME.");
-    turnLeft(TURN_SPEED);
-    delay(MOTION_DELAY);
-    releaseAllMotors();
-    if(getFlame() > maxFlameLeft)
-      maxFlameLeft = getFlame();
-  }
-  
-  // Return to center position
-  startTime = millis();
-  while((millis()-startTime) < TURN_DELAY && !isSwitchPressed()) {
-    print("RETURNING TO CENTER.");
-    turnRight(TURN_SPEED);
-    delay(MOTION_DELAY);
-    releaseAllMotors();
-  }
-  
-  // Determine whether a flame actually exists
-  if((maxFlameLeft < 30) && (maxFlameRight < 30)) {
-    print("DID NOT CONVERGE ON A FLAME.");
-    return false;
-  }
-  
-  // Evaluate scan results
-  if(maxFlameRight > maxFlameLeft) {
-    // Turn towards the flame if it is towards the right.
-    startTime = millis();
-    while(((getFlame() < (maxFlameRight-5)) || (millis()-startTime < 3000)) && !isSwitchPressed()) {
-      print("PURSUING RIGHT FLAME.");
-      turnRight(TURN_SPEED);
-      delay(MOTION_DELAY);
-      releaseAllMotors();
-    }
-  }
-  else {
-    // Turn towards the flame if it is towards the left.
-    startTime = millis();
-    while(getFlame() < (maxFlameLeft-5) || (millis()-startTime < 3000)) {
-      print("PURSUING LEFT FLAME.");
-      turnLeft(TURN_SPEED);
-      delay(MOTION_DELAY);
-      releaseAllMotors();
-    }
-  }
-  return true;
-}
-
-// Approach a flame by getting as close as possible to it.
-// We are close to the flame once the limit switch is depressed,
-// or once flame readings from the IR sensor begin to level off.
-void approachFlame() {
-  long startTime = millis();
-  while(!isSwitchPressed()) {
-    print("APPROACHING FLAME.");
+  while(getFlame() > THRESHOLD_FLAME) {
     moveForward(SPEED);
-    delay(MOTION_DELAY);
+    delay(FORWARD_DELAY);
     releaseAllMotors();
     
-    // Every 1 second, seek the flame again to ensure proper orientation
-    if((millis() - startTime) > 1000ul) {
-      print("REORIENTING TOWARDS FLAME.");
-      seekFlame();
-      startTime = millis();
+    if(getFlame() < (lastReading-FLAME_TOLERANCE)) 
+      return true;
+    lastReading = getFlame();
+    
+    while(getFlame() > lastReading) {
+      turnLeft(SPEED);
+      delay(MOTION_DELAY);
+      releaseAllMotors();
+    }
+    while(getFlame() > lastReading) {
+      turnRight(SPEED);
+      delay(MOTION_DELAY);
+      releaseAllMotors();
     }
   }
 }
