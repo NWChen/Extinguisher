@@ -28,9 +28,10 @@
 #define MOTION_DELAY 10
 
 // Servo control constants
-#define SPONGE_UP 80
-#define SPONGE_DOWN 20
+#define SPONGE_UP 85//85
+#define SPONGE_DOWN 20//40
 #define SERVO_PWM 9
+#define SMOTHER_DELAY 3000//10000
 
 // Sensor constants
 #define IR_LEFT 3
@@ -68,12 +69,10 @@ void setup()
 }
 
 void loop() {
-  
   // Line following subroutine
   // We follow the right edge of the line, which is assumed to have thickness wider
   // than the range of the IR transmitter-receiver pair,
   // so as to implicitly handle intersections of varying degree.
-  Serial.println(getFlame());
   
   // Make sure we don't fall off the maze.
   if(isOverEdge()) {
@@ -175,6 +174,11 @@ void releaseAllMotors() {
 // Lower and raise the smothering mechanism to put out the flame.
 void deploy() {
   
+  // Uncomment this section if using a balloon
+  moveBackward(SPEED);
+  delay(25);
+  releaseAllMotors();
+  
   // Reset the smothering mechanism to its upright position
   const int TIMEOUT = 10;
   servo.write(SPONGE_UP);
@@ -185,7 +189,7 @@ void deploy() {
     servo.write(i);
     delay(TIMEOUT);
   }
-  delay(15000);
+  delay(SMOTHER_DELAY);
   
   // Reset the smothering mechanism
   servo.write(SPONGE_UP);
@@ -247,26 +251,33 @@ boolean seekFlame() {
   
   // Turn right for intentional offset here?
   
-  while(getFlame() > THRESHOLD_FLAME) {
+  while((getFlame() > THRESHOLD_FLAME) && !isSwitchPressed()) {
     moveForward(SPEED);
     delay(FORWARD_DELAY);
     releaseAllMotors();
     
-    if(getFlame() < (lastReading-FLAME_TOLERANCE)) 
-      return true;
-    lastReading = getFlame();
-    
     while(getFlame() > lastReading) {
-      turnLeft(SPEED);
-      delay(MOTION_DELAY);
-      releaseAllMotors();
-    }
-    while(getFlame() > lastReading) {
+      lastReading = getFlame();
       turnRight(SPEED);
       delay(MOTION_DELAY);
       releaseAllMotors();
     }
+    
+    /*
+    while(getFlame() > lastReading) {
+      lastReading = getFlame();
+      turnLeft(SPEED);
+      delay(MOTION_DELAY);
+      releaseAllMotors();
+    }
+    */
+    
+    if((getFlame() < (lastReading-FLAME_TOLERANCE)) || isSwitchPressed()) 
+      return true;
+    lastReading = getFlame();
   }
+  if(isSwitchPressed())
+    return true;
 }
 
 // Print messages to the serial monitor without repetition.
