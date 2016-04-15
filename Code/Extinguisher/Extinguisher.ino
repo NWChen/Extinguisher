@@ -87,9 +87,8 @@ void loop() {
   // Seek a flame.
   if(getFlame() > THRESHOLD_FLAME) {
     print("POTENTIAL FLAME DETECTED.");
-    if(seekFlame()) {
+    if(seekFlame())
       deploy();
-    }
   }
   
   // |? x  | Robot to the right of the right line edge
@@ -245,39 +244,61 @@ int getFlame() {
 // Turn towards maximum flame readings.
 // Returns true if the algorithm can converge on a flame; false otherwise.
 boolean seekFlame() {
-  int lastReading = 0;
-  const int FLAME_TOLERANCE = 0;
-  const int FORWARD_DELAY = 50;
+  int readings[101];
+  readings[50] = getFlame();
   
-  // Turn right for intentional offset here?
-  
-  while((getFlame() > THRESHOLD_FLAME) && !isSwitchPressed()) {
-    moveForward(SPEED);
-    delay(FORWARD_DELAY);
+  // Sweep left
+  for(int i=50; i>=0; i--) {
+    turnLeft(SPEED);
+    delay(MOTION_DELAY);
     releaseAllMotors();
-    
-    while(getFlame() > lastReading) {
-      lastReading = getFlame();
-      turnRight(SPEED);
-      delay(MOTION_DELAY);
-      releaseAllMotors();
+    readings[i] = getFlame();
+  }
+  
+  // Return to center
+  turnRight(SPEED);
+  delay(50*MOTION_DELAY);
+  releaseAllMotors();
+  
+  // Sweep right
+  for(int i=50; i<101; i++) {
+    turnRight(SPEED);
+    delay(MOTION_DELAY);
+    releaseAllMotors();
+    readings[i] = getFlame();
+  }
+  
+  // Return to center
+  turnLeft(SPEED);
+  delay(50*MOTION_DELAY);
+  releaseAllMotors();
+  
+  // Identify max
+  int max = 0;
+  int maxIndex = 0;
+  for(int i=0; i<101; i++)
+    if(readings[i] > max) {
+      max = readings[i];
+      maxIndex = i;
     }
     
-    /*
-    while(getFlame() > lastReading) {
-      lastReading = getFlame();
+  // Move to max
+  if(maxIndex < 50)
+    for(int i=49; i>=maxIndex; i--) {
       turnLeft(SPEED);
       delay(MOTION_DELAY);
       releaseAllMotors();
     }
-    */
-    
-    if((getFlame() < (lastReading-FLAME_TOLERANCE)) || isSwitchPressed()) 
-      return true;
-    lastReading = getFlame();
-  }
-  if(isSwitchPressed())
-    return true;
+  if(maxIndex > 50)
+    for(int i=51; i<101; i++) {
+      turnRight(SPEED);
+      delay(MOTION_DELAY);
+      releaseAllMotors();
+    }
+  
+  moveForward(SPEED);
+  delay(200);
+  return true;  
 }
 
 // Print messages to the serial monitor without repetition.
