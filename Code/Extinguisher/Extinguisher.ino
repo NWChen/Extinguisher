@@ -40,7 +40,7 @@
 #define IR_FLAME 2
 #define LIMIT_SWITCH 1
 #define THRESHOLD_BLACK 100
-#define THRESHOLD_FLAME 90
+#define THRESHOLD_FLAME 30
 #define THRESHOLD_EDGE 500
 #define THRESHOLD_SWITCH 600
 #define MAX_READINGS 100
@@ -69,6 +69,9 @@ void setup()
 }
 
 void loop() {
+  
+  Serial.println(getFlame());
+  
   // Line following subroutine
   // We follow the right edge of the line, which is assumed to have thickness wider
   // than the range of the IR transmitter-receiver pair,
@@ -244,61 +247,76 @@ int getFlame() {
 // Turn towards maximum flame readings.
 // Returns true if the algorithm can converge on a flame; false otherwise.
 boolean seekFlame() {
-  int readings[101];
-  readings[50] = getFlame();
+  int counter = 0;
+  int leftReading, centerReading, rightReading;
+  const int TURN_DELAY = 100;
+  const int AT_FLAME = 98;
   
-  // Sweep left
-  for(int i=50; i>=0; i--) {
-    turnLeft(SPEED);
-    delay(MOTION_DELAY);
-    releaseAllMotors();
-    readings[i] = getFlame();
-  }
-  
-  // Return to center
-  turnRight(SPEED);
-  delay(50*MOTION_DELAY);
-  releaseAllMotors();
-  
-  // Sweep right
-  for(int i=50; i<101; i++) {
-    turnRight(SPEED);
-    delay(MOTION_DELAY);
-    releaseAllMotors();
-    readings[i] = getFlame();
-  }
-  
-  // Return to center
-  turnLeft(SPEED);
-  delay(50*MOTION_DELAY);
-  releaseAllMotors();
-  
-  // Identify max
-  int max = 0;
-  int maxIndex = 0;
-  for(int i=0; i<101; i++)
-    if(readings[i] > max) {
-      max = readings[i];
-      maxIndex = i;
-    }
-    
-  // Move to max
-  if(maxIndex < 50)
-    for(int i=49; i>=maxIndex; i--) {
+  while(getFlame() < AT_FLAME) {
+    counter = 0;
+    while(counter < 5) {
+      // Measure to local left
       turnLeft(SPEED);
-      delay(MOTION_DELAY);
+      delay(TURN_DELAY);
       releaseAllMotors();
-    }
-  if(maxIndex > 50)
-    for(int i=51; i<101; i++) {
+      delay(TURN_DELAY);
+      leftReading = getFlame();
+      
+      // Measure to local center
       turnRight(SPEED);
-      delay(MOTION_DELAY);
+      delay(TURN_DELAY);
       releaseAllMotors();
+      delay(TURN_DELAY);
+      centerReading = getFlame();
+      
+      // Measure to local right
+      turnRight(SPEED);
+      delay(TURN_DELAY);
+      releaseAllMotors();
+      delay(TURN_DELAY);
+      rightReading = getFlame();
+      
+      if((leftReading > centerReading) && (leftReading > rightReading)) {
+        turnLeft(SPEED);
+        delay(2*TURN_DELAY);
+        releaseAllMotors();
+      }
+      if((rightReading > centerReading) && (rightReading > leftReading)) {
+        Serial.print(""); // Pass for readability
+      }
+      if((centerReading > leftReading) && (centerReading > rightReading)) {
+        turnLeft(SPEED);
+        delay(TURN_DELAY);
+        releaseAllMotors();
+      }
+      moveForward(SPEED);
+      delay(TURN_DELAY);
+      releaseAllMotors();
+      counter++;
     }
+  }
+  return true;
   
-  moveForward(SPEED);
-  delay(200);
-  return true;  
+  /*
+  while(flame < threshold)
+    reset counter
+    while(number of instances of this shit < 50)
+      turn left
+      measure
+      
+      center
+      
+      turn right
+      measure
+      
+      if left > center && left > right
+        turn left
+      if right > center && right > left
+        turn right
+      if center > left && center > right
+        dont move
+  }
+  */
 }
 
 // Print messages to the serial monitor without repetition.
